@@ -1,0 +1,86 @@
+version: "3.7"
+
+services:
+  prometheus-server:
+    container_name: prometheus-server
+    image: prom/prometheus
+    restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - prometheus:/etc/prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.entrypoints=http"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.selfhost.ar`)"
+      - "traefik.http.middlewares.prometheus-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.prometheus.middlewares=prometheus-https-redirect"
+      - "traefik.http.routers.prometehus-secure.entrypoints=https"
+      - "traefik.http.routers.prometheus-secure.rule=Host(`prometheus.selfhost.ar`)"
+      - "traefik.http.routers.prometheus-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.prometheus-secure.tls=true"
+      - "traefik.http.routers.prometheus-secure.service=prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.docker.network=proxy"
+      
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss
+    environment:
+      GF_AUTH_LDAP_ENABLED: "true"
+      GF_AUTH_LDAP_CONFIG_FILE: "/etc/grafana/ldap.toml"
+    networks:
+      - proxy
+    restart: unless-stopped
+    volumes:
+      - grafana:/var/lib/grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.entrypoints=http"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.selfhost.ar`)"
+      - "traefik.http.middlewares.grafana-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.grafana.middlewares=grafana-https-redirect"
+      - "traefik.http.routers.grafana-secure.entrypoints=https"
+      - "traefik.http.routers.grafana-secure.rule=Host(`grafana.selfhost.ar`)"
+      - "traefik.http.routers.grafana-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.grafana-secure.tls=true"
+      - "traefik.http.routers.grafana-secure.service=grafana"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.docker.network=proxy"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    networks:
+      - proxy
+    container_name: cadvisor
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
+
+  prom_mikrotik_exporter:
+    image: nshttpd/mikrotik-exporter:1.0.12-DEVEL
+    container_name: mikrotik-exporter
+    networks:
+      - proxy
+    environment:
+       ADDRESS: $ADDRESS
+       DEVICE: $DEVICE
+       PASSWORD: $PASSWORD
+       USER: $USER
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
+volumes:
+  grafana:
+    external: true
+  prometheus:
+    external: true
+    
+networks:
+  proxy:
+    external: true
